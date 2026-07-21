@@ -18,10 +18,10 @@ test:
 	$(PYTHON) -m pytest tests/
 
 run:
-	$(PYTHON) main.py $(WORDS) $(LANG) -o $(OUT)
+	OUTPUT=$(OUT) $(PYTHON) main.py $(WORDS) $(LANG)
 
 run-fake:
-	$(PYTHON) main.py $(WORDS) $(LANG) -o $(OUT) --fake
+	OUTPUT=$(OUT) $(PYTHON) main.py $(WORDS) $(LANG) --fake
 
 clean:
 	find . -type d -name '__pycache__' -not -path './$(VENV)/*' -exec rm -rf {} +

@@ -1,20 +1,17 @@
-from anki_writer.llm.base import ExampleOutput
-
-DEFAULT_OLLAMA_MODEL = "qwen2.5:1.5b"
-DEFAULT_OLLAMA_HOST = "http://localhost:11434"
+from anki_writer.llm.base import T
 
 
 class OllamaSentenceGenerator:
-    """Generates structured (sentence, translation) output from a model
-    served by a local Ollama instance, using Ollama's structured-output
-    support (JSON-schema passed via the `format` field) so the response is
-    constrained to ExampleOutput's schema."""
+    """Generates structured output from a model served by a local Ollama
+    instance, using Ollama's structured-output support (JSON-schema passed
+    via the `format` field) so the response is constrained to the requested
+    pydantic output_type's schema."""
 
-    def __init__(self, model: str = DEFAULT_OLLAMA_MODEL, host: str = DEFAULT_OLLAMA_HOST):
+    def __init__(self, model: str, host: str):
         self._model = model
         self._host = host.rstrip("/")
 
-    def generate(self, prompt: str) -> ExampleOutput:
+    def generate(self, prompt: str, output_type: type[T]) -> T:
         import requests
 
         response = requests.post(
@@ -22,10 +19,10 @@ class OllamaSentenceGenerator:
             json={
                 "model": self._model,
                 "messages": [{"role": "user", "content": prompt}],
-                "format": ExampleOutput.model_json_schema(),
+                "format": output_type.model_json_schema(),
                 "stream": False,
             },
         )
         response.raise_for_status()
         content = response.json()["message"]["content"]
-        return ExampleOutput.model_validate_json(content)
+        return output_type.model_validate_json(content)

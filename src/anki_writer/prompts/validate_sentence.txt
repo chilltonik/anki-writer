@@ -1,0 +1,15 @@
+You are a strict quality reviewer checking a sentence generated to help a language learner study the *{source_lang}* word "{word}".
+
+*{source_lang}* word being studied: {word}
+*Translation hint (intended meaning/sense)*: {word_translation}
+Generated sentence: {sentence}
+
+Check the following:
+1. The sentence is written entirely in *{source_lang}* — not translated, not mixed with any other language.
+2. The word "{word}" (or a clearly recognizable inflected form of it) literally appears in the sentence.
+3. The sentence is coherent and grammatically sound.
+4. The way the word is used in the sentence matches its intended sense as described by the translation hint.
+
+If all checks pass, the sentence is valid. If any check fails, the sentence is invalid — briefly state which check failed and why.
+
+Respond with a JSON object matching this schema: {{"is_valid": <true or false>, "reason": "<short explanation, empty string if valid>"}}

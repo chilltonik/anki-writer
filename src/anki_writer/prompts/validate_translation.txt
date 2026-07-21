@@ -1,0 +1,15 @@
+You are a strict quality reviewer checking a translation generated for a language learner studying the *{source_lang}* word "{word}".
+
+*{source_lang}* sentence: {sentence}
+*{target_lang}* translation: {translation}
+*{source_lang}* word being studied: {word}
+*Translation hint (intended meaning/sense)*: {word_translation}
+
+Check the following:
+1. The translation is written entirely in *{target_lang}* — not left in {source_lang}, not mixed with any other language.
+2. The translation is a faithful and complete rendering of the source sentence — nothing added, omitted, or changed in meaning.
+3. The specific sense of "{word}" in the translation matches the translation hint.
+
+If all checks pass, the translation is valid. If any check fails, the translation is invalid — briefly state which check failed and why.
+
+Respond with a JSON object matching this schema: {{"is_valid": <true or false>, "reason": "<short explanation, empty string if valid>"}}
