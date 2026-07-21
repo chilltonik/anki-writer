@@ -1,0 +1,12 @@
+You are a helpful assistant who translates *{source_lang}* sentences into *{target_lang}* for a language learner.
+
+{source_lang} sentence to translate: {sentence}
+
+This sentence was written to illustrate the {source_lang} word "{word}", whose intended meaning/sense is given by this translation hint: {word_translation}
+
+Follow these steps:
+1. Translate the sentence fully and naturally into {target_lang}.
+2. Use the translation hint to make sure the word's specific meaning/sense is reflected accurately in the translation.
+3. Do not add, omit, or explain anything beyond a faithful translation of the sentence.
+
+Respond with a JSON object matching this schema: {{"translation": "<{target_lang} translation sentence>"}}

@@ -1,6 +1,6 @@
 import pytest
 
-from anki_writer.prompts import build_prompt, resolve_target_language
+from anki_writer.prompts import build_sentence_prompt, build_translation_prompt, resolve_target_language
 
 
 def test_resolve_target_language_supported_languages():
@@ -17,11 +17,21 @@ def test_resolve_target_language_rejects_unsupported():
         resolve_target_language("german")
 
 
-def test_build_prompt_includes_word_and_languages():
-    prompt = build_prompt("skriver", "пишет", "Norwegian", "English")
+def test_build_sentence_prompt_includes_word_and_source_lang():
+    prompt = build_sentence_prompt("skriver", "пишет", "Norwegian")
+    assert "skriver" in prompt
+    assert "пишет" in prompt
+    assert "Norwegian" in prompt
+    assert '"sentence"' in prompt
+    assert '"translation"' not in prompt
+    assert "English" not in prompt
+
+
+def test_build_translation_prompt_includes_sentence_word_and_languages():
+    prompt = build_translation_prompt("Han skriver.", "skriver", "пишет", "Norwegian", "English")
+    assert "Han skriver." in prompt
     assert "skriver" in prompt
     assert "пишет" in prompt
     assert "Norwegian" in prompt
     assert "English" in prompt
-    assert '"sentence"' in prompt
     assert '"translation"' in prompt

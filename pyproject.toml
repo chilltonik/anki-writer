@@ -8,7 +8,7 @@ dependencies = [
     "accelerate>=0.34",
     "outlines>=0.1",
     "pydantic>=2",
-    "python-dotenv>=1.0",
+    "pydantic-settings>=2",
     "requests>=2.31",
 ]
 

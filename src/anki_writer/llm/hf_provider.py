@@ -1,20 +1,16 @@
-from anki_writer.llm.base import ExampleOutput
-
-DEFAULT_HF_MODEL = "Qwen/Qwen2.5-1.5B-Instruct"
-
-DEFAULT_MAX_NEW_TOKENS = 300
+from anki_writer.llm.base import T
 
 
 class HFSentenceGenerator:
-    """Generates structured (sentence, translation) output from a local HF
-    instruct model, using constrained/guided JSON decoding so the model can
-    only produce output matching ExampleOutput's schema."""
+    """Generates structured output from a local HF instruct model, using
+    constrained/guided JSON decoding so the model can only produce output
+    matching the requested pydantic output_type's schema."""
 
     def __init__(
         self,
-        model_name: str = DEFAULT_HF_MODEL,
+        model_name: str,
+        max_new_tokens: int,
         device: str | None = None,
-        max_new_tokens: int = DEFAULT_MAX_NEW_TOKENS,
     ):
         import outlines
         from transformers import AutoModelForCausalLM, AutoTokenizer
@@ -24,13 +20,19 @@ class HFSentenceGenerator:
             hf_model = hf_model.to(device)
         tokenizer = AutoTokenizer.from_pretrained(model_name)
 
-        model = outlines.from_transformers(hf_model, tokenizer)
-        self._generator = outlines.Generator(model, ExampleOutput)
+        self._model = outlines.from_transformers(hf_model, tokenizer)
+        self._generators: dict[type, "outlines.Generator"] = {}
         self._max_new_tokens = max_new_tokens
 
-    def generate(self, prompt: str) -> ExampleOutput:
+    def generate(self, prompt: str, output_type: type[T]) -> T:
+        import outlines
         from outlines.inputs import Chat
 
+        generator = self._generators.get(output_type)
+        if generator is None:
+            generator = outlines.Generator(self._model, output_type)
+            self._generators[output_type] = generator
+
         chat = Chat([{"role": "user", "content": prompt}])
-        raw = self._generator(chat, max_new_tokens=self._max_new_tokens)
-        return ExampleOutput.model_validate_json(raw)
+        raw = generator(chat, max_new_tokens=self._max_new_tokens)
+        return output_type.model_validate_json(raw)

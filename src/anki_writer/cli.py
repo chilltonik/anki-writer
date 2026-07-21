@@ -1,11 +1,22 @@
 import argparse
 import json
+import logging
+from concurrent.futures import ThreadPoolExecutor
 
 from anki_writer.cards import build_card
-from anki_writer.config import Settings, load_settings
-from anki_writer.llm import create_generator
-from anki_writer.prompts import build_prompt, resolve_target_language
+from anki_writer.config import Settings
+from anki_writer.llm import SentenceGenerator, SentenceOutput, TranslationOutput, create_generator
+from anki_writer.prompts import build_sentence_prompt, build_translation_prompt, resolve_target_language
 from anki_writer.writer import write_anki_export
+
+logger = logging.getLogger(__name__)
+
+
+def configure_logging(log_level: str) -> None:
+    logging.basicConfig(
+        level=log_level,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    )
 
 
 def load_words(path: str) -> dict[str, str]:
@@ -13,22 +24,44 @@ def load_words(path: str) -> dict[str, str]:
         return json.load(f)
 
 
-def build_arg_parser(settings: Settings) -> argparse.ArgumentParser:
+def _generate_card(
+    generator: SentenceGenerator,
+    word: str,
+    word_translation: str,
+    source_lang: str,
+    target_lang: str,
+) -> tuple[str, str, str, str]:
+    logger.info("generating card for word %r", word)
+
+    sentence_prompt = build_sentence_prompt(word, word_translation, source_lang)
+    logger.debug("sentence prompt for %r:\n%s", word, sentence_prompt)
+    sentence = generator.generate(sentence_prompt, SentenceOutput).sentence
+    logger.debug("sentence response for %r: %r", word, sentence)
+
+    translation_prompt = build_translation_prompt(sentence, word, word_translation, source_lang, target_lang)
+    logger.debug("translation prompt for %r:\n%s", word, translation_prompt)
+    translation = generator.generate(translation_prompt, TranslationOutput).translation
+    logger.debug("translation response for %r: %r", word, translation)
+
+    return build_card(word, word_translation, sentence, translation)
+
+
+def _resolve_concurrency(provider: str, requested: int) -> int:
+    if provider == "hf" and requested > 1:
+        logger.warning(
+            "hf provider does not support concurrent generation "
+            "(single local model instance); running with concurrency=1"
+        )
+        return 1
+    return max(1, requested)
+
+
+def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Generate Anki cards from a word list using a local LLM."
     )
     parser.add_argument("words_file", help="Path to JSON file: {word: translation}")
     parser.add_argument("language", help="Language of the words, e.g. 'norwegian', 'english', 'polish'")
-    parser.add_argument("-o", "--output", default=settings.output, help="Path to write Anki text export")
-    parser.add_argument(
-        "--provider",
-        default=settings.provider,
-        choices=["hf", "ollama"],
-        help="Model provider: local Hugging Face model or Ollama",
-    )
-    parser.add_argument("--model", default=None, help="Model name override for the selected provider")
-    parser.add_argument("--device", default=settings.hf_device, help="cpu/cuda/auto (hf provider only)")
-    parser.add_argument("--ollama-host", default=settings.ollama_host, help="Ollama server URL")
     parser.add_argument(
         "--fake",
         action="store_true",
@@ -37,9 +70,30 @@ def build_arg_parser(settings: Settings) -> argparse.ArgumentParser:
     return parser
 
 
+def run(settings: Settings, words_file: str, language: str, target_lang: str, fake: bool) -> None:
+    words = load_words(words_file)
+    logger.info("loaded %d word(s) from %s", len(words), words_file)
+    generator = create_generator(settings, fake=fake)
+    concurrency = _resolve_concurrency(settings.provider, settings.concurrency)
+    logger.info("provider=%s concurrency=%d", settings.provider, concurrency)
+
+    with ThreadPoolExecutor(max_workers=concurrency) as executor:
+        cards = list(
+            executor.map(
+                lambda item: _generate_card(generator, item[0], item[1], language, target_lang),
+                words.items(),
+            )
+        )
+
+    write_anki_export(settings.output, cards)
+    logger.info("wrote %d card(s) to %s", len(cards), settings.output)
+
+
 def main(argv: list[str] | None = None) -> None:
-    settings = load_settings()
-    parser = build_arg_parser(settings)
+    settings = Settings()
+    configure_logging(settings.log_level)
+
+    parser = build_arg_parser()
     args = parser.parse_args(argv)
 
     try:
@@ -47,21 +101,7 @@ def main(argv: list[str] | None = None) -> None:
     except ValueError as exc:
         parser.error(str(exc))
 
-    settings.provider = args.provider
-    settings.hf_device = args.device
-    settings.ollama_host = args.ollama_host
-
-    words = load_words(args.words_file)
-    generator = create_generator(settings, fake=args.fake, model_override=args.model)
-
-    cards = []
-    for word, word_translation in words.items():
-        prompt = build_prompt(word, word_translation, args.language, target_lang)
-        result = generator.generate(prompt)
-        cards.append(build_card(word, word_translation, result.sentence, result.translation))
-
-    write_anki_export(args.output, cards)
-    print(f"Wrote {len(cards)} card(s) to {args.output}")
+    run(settings, args.words_file, args.language, target_lang, args.fake)
 
 
 if __name__ == "__main__":

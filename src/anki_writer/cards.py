@@ -1,16 +1,17 @@
 import html
+import logging
 import re
 
-CLOZE_NUM = 1
+logger = logging.getLogger(__name__)
 
 
-def mask_word_in_sentence(sentence: str, word: str, cloze_num: int = CLOZE_NUM) -> str:
+def mask_word_in_sentence(sentence: str, word: str, cloze_num: int = 1) -> str:
     """Wrap the first occurrence of `word` in `sentence` with Anki's native
     cloze syntax ({{cN::...}}). Falls back to the sentence unmasked (escaped,
     no cloze deletion) if `word` cannot be found in it."""
     match = re.search(rf"\b{re.escape(word)}\w*\b", sentence, re.IGNORECASE)
     if match is None:
-        print(f"warning: word {word!r} not found in generated sentence, showing unmasked")
+        logger.warning("word %r not found in generated sentence, showing unmasked", word)
         return html.escape(sentence)
 
     matched_text = html.escape(match.group(0))
@@ -19,7 +20,7 @@ def mask_word_in_sentence(sentence: str, word: str, cloze_num: int = CLOZE_NUM) 
     return f"{before}{{{{c{cloze_num}::{matched_text}}}}}{after}"
 
 
-def build_definition(word: str, word_translation: str, cloze_num: int = CLOZE_NUM) -> str:
+def build_definition(word: str, word_translation: str, cloze_num: int = 1) -> str:
     return f"{{{{c{cloze_num}::{html.escape(word)}}}}} - {html.escape(word_translation)}"
 
 
