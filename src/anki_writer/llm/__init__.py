@@ -1,6 +1,12 @@
 from typing import TYPE_CHECKING
 
-from anki_writer.llm.base import FakeSentenceGenerator, SentenceGenerator, SentenceOutput, TranslationOutput
+from anki_writer.llm.base import (
+    FakeSentenceGenerator,
+    SentenceGenerator,
+    SentenceOutput,
+    TranslationOutput,
+    ValidationOutput,
+)
 from anki_writer.llm.hf_provider import HFSentenceGenerator
 from anki_writer.llm.ollama_provider import OllamaSentenceGenerator
 
@@ -10,6 +16,7 @@ if TYPE_CHECKING:
 __all__ = [
     "SentenceOutput",
     "TranslationOutput",
+    "ValidationOutput",
     "SentenceGenerator",
     "FakeSentenceGenerator",
     "HFSentenceGenerator",

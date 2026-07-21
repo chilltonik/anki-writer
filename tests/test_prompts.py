@@ -1,6 +1,12 @@
 import pytest
 
-from anki_writer.prompts import build_sentence_prompt, build_translation_prompt, resolve_target_language
+from anki_writer.prompts import (
+    build_sentence_prompt,
+    build_sentence_validation_prompt,
+    build_translation_prompt,
+    build_translation_validation_prompt,
+    resolve_target_language,
+)
 
 
 def test_resolve_target_language_supported_languages():
@@ -35,3 +41,25 @@ def test_build_translation_prompt_includes_sentence_word_and_languages():
     assert "Norwegian" in prompt
     assert "English" in prompt
     assert '"translation"' in prompt
+
+
+def test_build_sentence_validation_prompt_includes_word_hint_and_sentence():
+    prompt = build_sentence_validation_prompt("skriver", "пишет", "Norwegian", "Han skriver et brev.")
+    assert "skriver" in prompt
+    assert "пишет" in prompt
+    assert "Norwegian" in prompt
+    assert "Han skriver et brev." in prompt
+    assert '"is_valid"' in prompt
+
+
+def test_build_translation_validation_prompt_includes_all_inputs():
+    prompt = build_translation_validation_prompt(
+        "Han skriver et brev.", "He writes a letter.", "skriver", "пишет", "Norwegian", "English"
+    )
+    assert "Han skriver et brev." in prompt
+    assert "He writes a letter." in prompt
+    assert "skriver" in prompt
+    assert "пишет" in prompt
+    assert "Norwegian" in prompt
+    assert "English" in prompt
+    assert '"is_valid"' in prompt

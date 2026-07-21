@@ -1,7 +1,13 @@
 import json
 from unittest.mock import MagicMock, patch
 
-from anki_writer.llm import FakeSentenceGenerator, OllamaSentenceGenerator, SentenceOutput, TranslationOutput
+from anki_writer.llm import (
+    FakeSentenceGenerator,
+    OllamaSentenceGenerator,
+    SentenceOutput,
+    TranslationOutput,
+    ValidationOutput,
+)
 
 
 def test_fake_sentence_generator_default_response():
@@ -18,6 +24,19 @@ def test_fake_sentence_generator_custom_response():
     generator = FakeSentenceGenerator(sentence="Han skriver.", translation="He writes.")
     assert generator.generate("prompt", SentenceOutput) == SentenceOutput(sentence="Han skriver.")
     assert generator.generate("prompt", TranslationOutput) == TranslationOutput(translation="He writes.")
+
+
+def test_fake_sentence_generator_defaults_to_valid():
+    generator = FakeSentenceGenerator()
+    result = generator.generate("any prompt", ValidationOutput)
+    assert result == ValidationOutput(is_valid=True, reason="")
+
+
+def test_fake_sentence_generator_can_report_invalid():
+    generator = FakeSentenceGenerator(is_valid=False)
+    result = generator.generate("any prompt", ValidationOutput)
+    assert result.is_valid is False
+    assert result.reason != ""
 
 
 def test_ollama_sentence_generator_sends_expected_request_and_parses_response():

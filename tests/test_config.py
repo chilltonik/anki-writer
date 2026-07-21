@@ -17,6 +17,7 @@ def test_defaults_apply_with_no_env(monkeypatch):
     assert settings.ollama_host == "http://localhost:11434"
     assert settings.output == "output.txt"
     assert settings.concurrency == 1
+    assert settings.max_regenerate_attempts == 2
 
 
 def test_invalid_provider_raises():
@@ -32,8 +33,10 @@ def test_invalid_hf_max_new_tokens_raises():
 def test_env_vars_override_defaults(monkeypatch):
     monkeypatch.setenv("PROVIDER", "ollama")
     monkeypatch.setenv("CONCURRENCY", "4")
+    monkeypatch.setenv("MAX_REGENERATE_ATTEMPTS", "5")
 
     settings = Settings(_env_file=None)
 
     assert settings.provider == "ollama"
     assert settings.concurrency == 4
+    assert settings.max_regenerate_attempts == 5

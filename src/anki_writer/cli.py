@@ -1,12 +1,20 @@
 import argparse
 import json
 import logging
+import time
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 
 from anki_writer.cards import build_card
 from anki_writer.config import Settings
-from anki_writer.llm import SentenceGenerator, SentenceOutput, TranslationOutput, create_generator
-from anki_writer.prompts import build_sentence_prompt, build_translation_prompt, resolve_target_language
+from anki_writer.llm import SentenceGenerator, SentenceOutput, TranslationOutput, ValidationOutput, create_generator
+from anki_writer.prompts import (
+    build_sentence_prompt,
+    build_sentence_validation_prompt,
+    build_translation_prompt,
+    build_translation_validation_prompt,
+    resolve_target_language,
+)
 from anki_writer.writer import write_anki_export
 
 logger = logging.getLogger(__name__)
@@ -24,25 +32,99 @@ def load_words(path: str) -> dict[str, str]:
         return json.load(f)
 
 
+def _generate_validated(
+    generate: Callable[[], str],
+    validate: Callable[[str], ValidationOutput],
+    max_attempts: int,
+    label: str,
+    word: str,
+) -> str:
+    """Call `generate`, then `validate` its result; if invalid, call `generate`
+    again and re-validate, up to `max_attempts` regenerations. Returns the last
+    generated value regardless of whether it ultimately passed validation."""
+    overall_start = time.perf_counter()
+    attempt = 1
+    gen_start = time.perf_counter()
+    value = generate()
+    logger.info("%s for %r: generation attempt %d took %.2fs", label, word, attempt, time.perf_counter() - gen_start)
+
+    while True:
+        val_start = time.perf_counter()
+        result = validate(value)
+        val_elapsed = time.perf_counter() - val_start
+        logger.info(
+            "%s for %r: validation of attempt %d took %.2fs -> %s%s",
+            label, word, attempt, val_elapsed,
+            "valid" if result.is_valid else "invalid",
+            f" ({result.reason})" if not result.is_valid else "",
+        )
+        if result.is_valid:
+            logger.info(
+                "%s for %r validated successfully after %d attempt(s), total %.2fs",
+                label, word, attempt, time.perf_counter() - overall_start,
+            )
+            return value
+        if attempt > max_attempts:
+            logger.warning(
+                "%s for %r still failing validation after %d regeneration(s), using last attempt "
+                "(total %.2fs): %s",
+                label, word, max_attempts, time.perf_counter() - overall_start, result.reason,
+            )
+            return value
+        logger.warning(
+            "%s for %r failed validation (attempt %d/%d), regenerating: %s",
+            label, word, attempt, max_attempts, result.reason,
+        )
+        attempt += 1
+        gen_start = time.perf_counter()
+        value = generate()
+        logger.info("%s for %r: generation attempt %d took %.2fs", label, word, attempt, time.perf_counter() - gen_start)
+
+
 def _generate_card(
     generator: SentenceGenerator,
     word: str,
     word_translation: str,
     source_lang: str,
     target_lang: str,
+    max_regenerate_attempts: int,
 ) -> tuple[str, str, str, str]:
     logger.info("generating card for word %r", word)
+    card_start = time.perf_counter()
 
-    sentence_prompt = build_sentence_prompt(word, word_translation, source_lang)
-    logger.debug("sentence prompt for %r:\n%s", word, sentence_prompt)
-    sentence = generator.generate(sentence_prompt, SentenceOutput).sentence
-    logger.debug("sentence response for %r: %r", word, sentence)
+    def generate_sentence() -> str:
+        sentence_prompt = build_sentence_prompt(word, word_translation, source_lang)
+        logger.debug("sentence prompt for %r:\n%s", word, sentence_prompt)
+        sentence = generator.generate(sentence_prompt, SentenceOutput).sentence
+        logger.debug("sentence response for %r: %r", word, sentence)
+        return sentence
 
-    translation_prompt = build_translation_prompt(sentence, word, word_translation, source_lang, target_lang)
-    logger.debug("translation prompt for %r:\n%s", word, translation_prompt)
-    translation = generator.generate(translation_prompt, TranslationOutput).translation
-    logger.debug("translation response for %r: %r", word, translation)
+    def validate_sentence(sentence: str) -> ValidationOutput:
+        validation_prompt = build_sentence_validation_prompt(word, word_translation, source_lang, sentence)
+        return generator.generate(validation_prompt, ValidationOutput)
 
+    sentence = _generate_validated(
+        generate_sentence, validate_sentence, max_regenerate_attempts, "sentence", word
+    )
+
+    def generate_translation() -> str:
+        translation_prompt = build_translation_prompt(sentence, word, word_translation, source_lang, target_lang)
+        logger.debug("translation prompt for %r:\n%s", word, translation_prompt)
+        translation = generator.generate(translation_prompt, TranslationOutput).translation
+        logger.debug("translation response for %r: %r", word, translation)
+        return translation
+
+    def validate_translation(translation: str) -> ValidationOutput:
+        validation_prompt = build_translation_validation_prompt(
+            sentence, translation, word, word_translation, source_lang, target_lang
+        )
+        return generator.generate(validation_prompt, ValidationOutput)
+
+    translation = _generate_validated(
+        generate_translation, validate_translation, max_regenerate_attempts, "translation", word
+    )
+
+    logger.info("finished card for word %r in %.2fs", word, time.perf_counter() - card_start)
     return build_card(word, word_translation, sentence, translation)
 
 
@@ -80,7 +162,9 @@ def run(settings: Settings, words_file: str, language: str, target_lang: str, fa
     with ThreadPoolExecutor(max_workers=concurrency) as executor:
         cards = list(
             executor.map(
-                lambda item: _generate_card(generator, item[0], item[1], language, target_lang),
+                lambda item: _generate_card(
+                    generator, item[0], item[1], language, target_lang, settings.max_regenerate_attempts
+                ),
                 words.items(),
             )
         )

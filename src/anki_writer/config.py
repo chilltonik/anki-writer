@@ -15,3 +15,4 @@ class Settings(BaseSettings):
     ollama_host: str = "http://localhost:11434"
     output: str = "output.txt"
     concurrency: int = 1
+    max_regenerate_attempts: int = 2
