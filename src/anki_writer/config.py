@@ -16,3 +16,5 @@ class Settings(BaseSettings):
     output: str = "output.txt"
     concurrency: int = 1
     max_regenerate_attempts: int = 2
+    deepl_api_key: str | None = None
+    deepl_api_host: str = "https://api-free.deepl.com"
