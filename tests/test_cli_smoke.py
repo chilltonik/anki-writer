@@ -98,7 +98,9 @@ def test_generate_validated_regenerates_until_valid():
         return value
 
     def validate(value):
-        return ValidationOutput(is_valid=(value == "good"), reason="" if value == "good" else "not good enough")
+        return ValidationOutput(
+            is_valid=(value == "good"), reason="" if value == "good" else "not good enough"
+        )
 
     result = _generate_validated(generate, validate, max_attempts=2, label="thing", word="w")
 
