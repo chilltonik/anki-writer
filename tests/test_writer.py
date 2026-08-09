@@ -5,7 +5,12 @@ from anki_writer.writer import write_anki_export
 
 def test_write_anki_export_header_and_rows(tmp_path):
     cards = [
-        ("skriver", "{{c1::skriver}} - пишет", "Han {{c1::skriver}} et brev.", "He writes a letter."),
+        (
+            "skriver",
+            "{{c1::skriver}} - пишет",
+            "Han {{c1::skriver}} et brev.",
+            "He writes a letter.",
+        ),
         ("spise", "{{c1::spise}} - есть", "Jeg {{c1::spiser}} maten.", "I eat the food."),
     ]
 

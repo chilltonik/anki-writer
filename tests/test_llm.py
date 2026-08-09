@@ -5,7 +5,6 @@ from anki_writer.llm import (
     FakeSentenceGenerator,
     OllamaSentenceGenerator,
     SentenceOutput,
-    TranslationOutput,
     ValidationOutput,
 )
 
@@ -13,17 +12,13 @@ from anki_writer.llm import (
 def test_fake_sentence_generator_default_response():
     generator = FakeSentenceGenerator()
     sentence_result = generator.generate("any prompt", SentenceOutput)
-    translation_result = generator.generate("any prompt", TranslationOutput)
     assert isinstance(sentence_result, SentenceOutput)
     assert sentence_result.sentence == "Default sentence."
-    assert isinstance(translation_result, TranslationOutput)
-    assert translation_result.translation == "Default translation."
 
 
 def test_fake_sentence_generator_custom_response():
-    generator = FakeSentenceGenerator(sentence="Han skriver.", translation="He writes.")
+    generator = FakeSentenceGenerator(sentence="Han skriver.")
     assert generator.generate("prompt", SentenceOutput) == SentenceOutput(sentence="Han skriver.")
-    assert generator.generate("prompt", TranslationOutput) == TranslationOutput(translation="He writes.")
 
 
 def test_fake_sentence_generator_defaults_to_valid():
@@ -42,19 +37,19 @@ def test_fake_sentence_generator_can_report_invalid():
 def test_ollama_sentence_generator_sends_expected_request_and_parses_response():
     mock_response = MagicMock()
     mock_response.json.return_value = {
-        "message": {"content": json.dumps({"translation": "He writes."})}
+        "message": {"content": json.dumps({"sentence": "Han skriver."})}
     }
 
     with patch("requests.post", return_value=mock_response) as mock_post:
         generator = OllamaSentenceGenerator(model="qwen2.5:1.5b", host="http://localhost:11434")
-        result = generator.generate("some prompt", TranslationOutput)
+        result = generator.generate("some prompt", SentenceOutput)
 
-    assert result == TranslationOutput(translation="He writes.")
+    assert result == SentenceOutput(sentence="Han skriver.")
 
     mock_post.assert_called_once()
     _, kwargs = mock_post.call_args
     assert kwargs["json"]["model"] == "qwen2.5:1.5b"
     assert kwargs["json"]["messages"] == [{"role": "user", "content": "some prompt"}]
-    assert kwargs["json"]["format"] == TranslationOutput.model_json_schema()
+    assert kwargs["json"]["format"] == SentenceOutput.model_json_schema()
     assert kwargs["json"]["stream"] is False
     mock_response.raise_for_status.assert_called_once()

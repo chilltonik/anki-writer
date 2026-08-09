@@ -10,10 +10,11 @@ dependencies = [
     "pydantic>=2",
     "pydantic-settings>=2",
     "requests>=2.31",
+    "pre-commit>=4.6.1",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest"]
+dev = ["pytest", "pre-commit", "ruff", "mypy"]
 
 [tool.uv.sources]
 torch = [
@@ -34,3 +35,12 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 anki_writer = ["prompts/*.txt"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true
+check_untyped_defs = true

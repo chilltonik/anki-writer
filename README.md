@@ -122,3 +122,12 @@ make run WORDS=data/norwegian.json LANG=norwegian OUT=generated/norwegian.txt
 ```bash
 make run WORDS=data/polish.json LANG=polish OUT=generated/polish.txt
 ```
+
+## Development
+
+Pre-commit hooks (ruff + mypy) are configured:
+
+```bash
+pre-commit install
+pre-commit run --all-files
+```
