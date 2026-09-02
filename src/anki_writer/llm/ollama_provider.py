@@ -20,6 +20,7 @@ class OllamaSentenceGenerator:
                 "model": self._model,
                 "messages": [{"role": "user", "content": prompt}],
                 "format": output_type.model_json_schema(),
+                "think": False,
                 "stream": False,
             },
         )

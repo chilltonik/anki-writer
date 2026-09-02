@@ -1,7 +1,3 @@
-VENV := .venv
-PYTHON := $(VENV)/bin/python
-PIP := $(VENV)/bin/pip
-
 WORDS ?= words.json
 LANG ?= norwegian
 OUT ?= generated.txt
@@ -9,20 +5,22 @@ OUT ?= generated.txt
 .PHONY: install install-dev test run run-fake clean
 
 install:
-	$(PIP) install -e .
+	uv sync
 
 install-dev:
-	$(PIP) install -e ".[dev]"
+	uv sync --extra dev
 
 test:
-	$(PYTHON) -m pytest tests/
+	uv run pytest tests/
 
+run: export OUTPUT = $(OUT)
 run:
-	OUTPUT=$(OUT) $(PYTHON) main.py $(WORDS) $(LANG)
+	uv run python main.py $(WORDS) $(LANG)
 
+run-fake: export OUTPUT = $(OUT)
 run-fake:
-	OUTPUT=$(OUT) $(PYTHON) main.py $(WORDS) $(LANG) --fake
+	uv run python main.py $(WORDS) $(LANG) --fake
 
 clean:
-	find . -type d -name '__pycache__' -not -path './$(VENV)/*' -exec rm -rf {} +
+	find . -type d -name '__pycache__' -not -path './.venv/*' -exec rm -rf {} +
 	rm -rf .pytest_cache src/anki_writer.egg-info

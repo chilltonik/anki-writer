@@ -1,4 +1,8 @@
+import logging
+
 from anki_writer.llm.base import T
+
+logger = logging.getLogger(__name__)
 
 
 class HFSentenceGenerator:
@@ -18,6 +22,7 @@ class HFSentenceGenerator:
         hf_model = AutoModelForCausalLM.from_pretrained(model_name)
         if device:
             hf_model = hf_model.to(device)
+        logger.info("hf model '%s' loaded on device: %s", model_name, hf_model.device)
         tokenizer = AutoTokenizer.from_pretrained(model_name)
 
         self._model = outlines.from_transformers(hf_model, tokenizer)

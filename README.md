@@ -5,14 +5,14 @@
 ## Быстрый старт
 
 ```
-make install-dev   # ставит рантайм- и dev-зависимости в .venv
+make install-dev   # ставит рантайм- и dev-зависимости через uv (создаёт .venv сам)
 make test           # прогоняет тесты (без скачивания модели)
 cp .env.example .env  # опционально: настроить провайдера/модель, см. ниже
 make run-fake WORDS=words.json LANG=norwegian OUT=generated.txt   # smoke-прогон без модели
 make run WORDS=words.json LANG=norwegian OUT=generated.txt        # реальный прогон
 ```
 
-Все команды предполагают, что `.venv` уже создан (`python3 -m venv .venv`) — Makefile сам обращается к `.venv/bin/python`/`.venv/bin/pip`, отдельно активировать venv не нужно.
+Пакетный менеджер — [uv](https://docs.astral.sh/uv/). Makefile вызывает `uv sync`/`uv run` — отдельно создавать или активировать `.venv` не нужно, uv делает это сам на основе `pyproject.toml`/`uv.lock`.
 
 ## Установка
 
@@ -64,20 +64,17 @@ make run WORDS=words.json LANG=norwegian OUT=generated.txt
 
 Переменные `WORDS`/`LANG`/`OUT` необязательны — по умолчанию `words.json`/`norwegian`/`generated.txt`. Быстрая проверка пайплайна без модели, теми же переменными: `make run-fake WORDS=... LANG=... OUT=...` (эквивалент флага `--fake`).
 
-Дополнительные CLI-флаги (`--provider`, `--model`, `--device`, `--ollama-host`) через `make run`/`make run-fake` не пробрасываются — для них запускайте CLI напрямую:
+Флаг `--fake` через `make run`/`make run-fake` не пробрасывается — для него запускайте CLI напрямую:
 
 ```
-.venv/bin/python main.py words.json norwegian -o generated.txt --provider ollama --model qwen2.5:1.5b
+uv run python main.py words.json norwegian --fake
 ```
+
+Провайдер/модель/device/output — не CLI-флаги, а переменные `.env`/окружения (см. `Settings` в `src/anki_writer/config.py` и `.env.example`).
 
 Аргументы CLI:
 - `words_file` — путь к JSON со словами.
-- `language` — язык изучаемых слов. Поддерживаются: `english`, `norwegian`, `polish` — все три переводятся на русский (`Russian`). Любой другой язык — ошибка с понятным сообщением.
-- `-o/--output` — путь к выходному файлу (по умолчанию из `.env`/`output.txt`).
-- `--provider` — `hf` (локальная HF-модель) или `ollama` (модель через Ollama). По умолчанию из `.env`/`hf`.
-- `--model` — переопределить имя модели для выбранного провайдера.
-- `--device` — `cpu`/`cuda` (только для `hf`-провайдера).
-- `--ollama-host` — адрес Ollama-сервера (только для `ollama`-провайдера).
+- `language` — язык изучаемых слов. Поддерживаются: `english` (→ русский), `norwegian` (→ английский), `polish` (→ английский). Любой другой язык — ошибка с понятным сообщением.
 - `--fake` — сгенерировать карточки с заглушкой вместо реальной модели (для быстрой проверки pipeline без скачивания весов и без Ollama).
 
 Результат — текстовый файл в формате Anki plain-text export (`#separator:tab`, `#html:true`), который импортируется через Anki: File → Import → выбрать файл. При импорте нужно вручную выбрать **note type** (Cloze-производный, с полями `keyword`/`definition`/`example`/`translation` в таком порядке) и сопоставить колонки файла этим полям — файл не содержит заголовка `#notetype`/`#columns`, поэтому маппинг делается руками в диалоге импорта Anki.
