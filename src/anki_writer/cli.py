@@ -58,13 +58,12 @@ def _generate_validated(
         result = validate(value)
         val_elapsed = time.perf_counter() - val_start
         logger.info(
-            "%s for %r: validation of attempt %d took %.2fs -> %s%s",
+            "%s for %r: validation of attempt %d took %.2fs -> %s",
             label,
             word,
             attempt,
             val_elapsed,
             "valid" if result.is_valid else "invalid",
-            f" ({result.reason})" if not result.is_valid else "",
         )
         if result.is_valid:
             logger.info(
@@ -78,22 +77,22 @@ def _generate_validated(
         if attempt > max_attempts:
             logger.warning(
                 "%s for %r still failing validation after %d regeneration(s), using last attempt "
-                "(total %.2fs): %s",
+                "(total %.2fs)",
                 label,
                 word,
                 max_attempts,
                 time.perf_counter() - overall_start,
-                result.reason,
             )
+            logger.debug("%s for %r: last validation reason: %s", label, word, result.reason)
             return value
         logger.warning(
-            "%s for %r failed validation (attempt %d/%d), regenerating: %s",
+            "%s for %r failed validation (attempt %d/%d), regenerating",
             label,
             word,
             attempt,
             max_attempts,
-            result.reason,
         )
+        logger.debug("%s for %r: last validation reason: %s", label, word, result.reason)
         attempt += 1
         gen_start = time.perf_counter()
         value = generate()
