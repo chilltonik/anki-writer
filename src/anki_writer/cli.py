@@ -14,7 +14,7 @@ from anki_writer.prompts import (
     resolve_target_language,
 )
 from anki_writer.translator import Translator, create_translator
-from anki_writer.writer import write_anki_export
+from anki_writer.writer import AnkiExportWriter
 
 logger = logging.getLogger(__name__)
 
@@ -178,24 +178,37 @@ def run(settings: Settings, words_file: str, language: str, target_lang: str, fa
     concurrency = _resolve_concurrency(settings.provider, settings.concurrency)
     logger.info("provider=%s concurrency=%d", settings.provider, concurrency)
 
-    with ThreadPoolExecutor(max_workers=concurrency) as executor:
-        cards = list(
-            executor.map(
-                lambda item: _generate_card(
+    written = 0
+    with AnkiExportWriter(settings.output) as export_writer:
+        with ThreadPoolExecutor(max_workers=concurrency) as executor:
+            futures = [
+                executor.submit(
+                    _generate_card,
                     generator,
                     translator,
-                    item[0],
-                    item[1],
+                    word,
+                    word_translation,
                     language,
                     target_lang,
                     settings.max_regenerate_attempts,
-                ),
-                words.items(),
-            )
-        )
+                )
+                for word, word_translation in words.items()
+            ]
 
-    write_anki_export(settings.output, cards)
-    logger.info("wrote %d card(s) to %s", len(cards), settings.output)
+            try:
+                for future in futures:
+                    card = future.result()
+                    export_writer.write_card(card)
+                    written += 1
+            except Exception:
+                logger.exception(
+                    "card generation failed after %d card(s) written; partial export saved to %s",
+                    written,
+                    settings.output,
+                )
+                raise
+
+    logger.info("wrote %d card(s) to %s", written, settings.output)
 
 
 def main(argv: list[str] | None = None) -> None:
