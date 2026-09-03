@@ -1,3 +1,5 @@
+SHELL := /bin/bash
+
 WORDS ?= words.json
 LANG ?= norwegian
 OUT ?= generated.txt
@@ -15,11 +17,13 @@ test:
 
 run: export OUTPUT = $(OUT)
 run:
-	uv run python main.py $(WORDS) $(LANG)
+	mkdir -p logs
+	uv run python main.py $(WORDS) $(LANG) |& tee logs/main.log
 
 run-fake: export OUTPUT = $(OUT)
 run-fake:
-	uv run python main.py $(WORDS) $(LANG) --fake
+	mkdir -p logs
+	uv run python main.py $(WORDS) $(LANG) --fake |& tee logs/main.log
 
 clean:
 	find . -type d -name '__pycache__' -not -path './.venv/*' -exec rm -rf {} +

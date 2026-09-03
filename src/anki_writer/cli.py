@@ -14,7 +14,7 @@ from anki_writer.prompts import (
     resolve_target_language,
 )
 from anki_writer.translator import Translator, create_translator
-from anki_writer.writer import write_anki_export
+from anki_writer.writer import AnkiExportWriter
 
 logger = logging.getLogger(__name__)
 
@@ -58,13 +58,12 @@ def _generate_validated(
         result = validate(value)
         val_elapsed = time.perf_counter() - val_start
         logger.info(
-            "%s for %r: validation of attempt %d took %.2fs -> %s%s",
+            "%s for %r: validation of attempt %d took %.2fs -> %s",
             label,
             word,
             attempt,
             val_elapsed,
             "valid" if result.is_valid else "invalid",
-            f" ({result.reason})" if not result.is_valid else "",
         )
         if result.is_valid:
             logger.info(
@@ -78,22 +77,22 @@ def _generate_validated(
         if attempt > max_attempts:
             logger.warning(
                 "%s for %r still failing validation after %d regeneration(s), using last attempt "
-                "(total %.2fs): %s",
+                "(total %.2fs)",
                 label,
                 word,
                 max_attempts,
                 time.perf_counter() - overall_start,
-                result.reason,
             )
+            logger.debug("%s for %r: last validation reason: %s", label, word, result.reason)
             return value
         logger.warning(
-            "%s for %r failed validation (attempt %d/%d), regenerating: %s",
+            "%s for %r failed validation (attempt %d/%d), regenerating",
             label,
             word,
             attempt,
             max_attempts,
-            result.reason,
         )
+        logger.debug("%s for %r: last validation reason: %s", label, word, result.reason)
         attempt += 1
         gen_start = time.perf_counter()
         value = generate()
@@ -178,24 +177,37 @@ def run(settings: Settings, words_file: str, language: str, target_lang: str, fa
     concurrency = _resolve_concurrency(settings.provider, settings.concurrency)
     logger.info("provider=%s concurrency=%d", settings.provider, concurrency)
 
-    with ThreadPoolExecutor(max_workers=concurrency) as executor:
-        cards = list(
-            executor.map(
-                lambda item: _generate_card(
+    written = 0
+    with AnkiExportWriter(settings.output) as export_writer:
+        with ThreadPoolExecutor(max_workers=concurrency) as executor:
+            futures = [
+                executor.submit(
+                    _generate_card,
                     generator,
                     translator,
-                    item[0],
-                    item[1],
+                    word,
+                    word_translation,
                     language,
                     target_lang,
                     settings.max_regenerate_attempts,
-                ),
-                words.items(),
-            )
-        )
+                )
+                for word, word_translation in words.items()
+            ]
 
-    write_anki_export(settings.output, cards)
-    logger.info("wrote %d card(s) to %s", len(cards), settings.output)
+            try:
+                for future in futures:
+                    card = future.result()
+                    export_writer.write_card(card)
+                    written += 1
+            except Exception:
+                logger.exception(
+                    "card generation failed after %d card(s) written; partial export saved to %s",
+                    written,
+                    settings.output,
+                )
+                raise
+
+    logger.info("wrote %d card(s) to %s", written, settings.output)
 
 
 def main(argv: list[str] | None = None) -> None:
